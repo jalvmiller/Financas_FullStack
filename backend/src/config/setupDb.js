@@ -14,11 +14,11 @@
 // - Client: diferente do Pool de db.js, usar Client porque é uma
 //  conexão única, direta e temporária
 // - dotenv: carrega as variáveis do .env
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-import pkg from "pg";
-import dotenv from "dotenv";
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import pkg from 'pg';
+import dotenv from 'dotenv';
 
 dotenv.config();
 
@@ -27,15 +27,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function setup() {
-  const dbName = process.env.DB_NAME || "financas";
-  const user = process.env.DB_USER || "postgres";
-  const password = process.env.DB_PASSWORD || "postgres";
-  const host = process.env.DB_HOST || "localhost";
+  const dbName = process.env.DB_NAME || 'financas';
+  const user = process.env.DB_USER || 'postgres';
+  const password = process.env.DB_PASSWORD || 'postgres';
+  const host = process.env.DB_HOST || 'localhost';
   const port = Number(process.env.DB_PORT) || 5432;
 
-  console.log(
-    `Conectando ao PostgreSQL em ${host}:${port} como usuário "${user}"...`,
-  );
+  console.log(`Conectando ao PostgreSQL em ${host}:${port} como usuário "${user}"...`);
 
   // 2. ETAPA 1: Garantir que o banco de dados 'financas' exista,
   // conectar ao banco de sistema padrão 'postgres'
@@ -47,16 +45,13 @@ async function setup() {
     port,
     user,
     password,
-    database: "postgres",
+    database: 'postgres',
   });
 
   try {
     await adminClient.connect();
     // Consulta no catálogo do Postgres se o banco já existe
-    const res = await adminClient.query(
-      `SELECT 1 FROM pg_database WHERE datname = $1`,
-      [dbName],
-    );
+    const res = await adminClient.query(`SELECT 1 FROM pg_database WHERE datname = $1`, [dbName]);
 
     if (res.rowCount === 0) {
       console.log(`Banco "${dbName}" não encontrado. Criando...`);
@@ -69,10 +64,7 @@ async function setup() {
       console.log(`Banco "${dbName}" já existe.`);
     }
   } catch (err) {
-    console.error(
-      "Aviso ao verificar/criar banco no postgres admin:",
-      err.message,
-    );
+    console.error('Aviso ao verificar/criar banco no postgres admin:', err.message);
   } finally {
     // Sempre encerra a conexão temporária
     await adminClient.end();
@@ -95,25 +87,25 @@ async function setup() {
     console.log(`Conectado ao banco "${dbName}".`);
 
     // Resolve o caminho absoluto até a pasta backend/database/
-    const schemaPath = path.resolve(__dirname, "../../database/schema.sql");
-    const seedPath = path.resolve(__dirname, "../../database/seed.sql");
+    const schemaPath = path.resolve(__dirname, '../../database/schema.sql');
+    const seedPath = path.resolve(__dirname, '../../database/seed.sql');
 
     // Executa o schema.sql (DDL com tabelas, chaves estrangeiras, checks e índices)
-    console.log("Executando schema.sql...");
-    const schemaSql = fs.readFileSync(schemaPath, "utf8");
+    console.log('Executando schema.sql...');
+    const schemaSql = fs.readFileSync(schemaPath, 'utf8');
     await appClient.query(schemaSql);
-    console.log("Tabelas e índices criados");
+    console.log('Tabelas e índices criados');
 
     // Executa o seed.sql
     // (2 usuários com senhas hash bcrypt e > 3 meses de lançamentos)
-    console.log("Executando seed.sql...");
-    const seedSql = fs.readFileSync(seedPath, "utf8");
+    console.log('Executando seed.sql...');
+    const seedSql = fs.readFileSync(seedPath, 'utf8');
     await appClient.query(seedSql);
-    console.log("Dados iniciais inseridos com sucesso!");
+    console.log('Dados iniciais inseridos com sucesso!');
 
-    console.log("\nConfiguração do banco de dados concluída com sucesso!");
+    console.log('\nConfiguração do banco de dados concluída com sucesso!');
   } catch (err) {
-    console.error("Erro ao executar scripts do banco:", err);
+    console.error('Erro ao executar scripts do banco:', err);
     process.exit(1);
   } finally {
     await appClient.end();

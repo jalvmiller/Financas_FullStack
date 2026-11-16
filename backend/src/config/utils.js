@@ -8,7 +8,7 @@
 
 // 3. VALIDAÇÃO DE CPF (RF1)
 export function cpfValido(cpf) {
-  const d = String(cpf).replace(/\D/g, ""); // mantém só os dígitos (remove pontos e traço)
+  const d = String(cpf).replace(/\D/g, ''); // mantém só os dígitos (remove pontos e traço)
 
   // Rejeita strings que não tenham 11 dígitos ou sejam sequências repetidas 111.111.111-11
   if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) {
@@ -94,12 +94,9 @@ function dataSegura(ano, mes, dia) {
  * @returns {{ referencia: string, fechamento: string, vencimento: string }}
  */
 export function calcularFatura(dataCompra, cartao, numeroParcela = 1) {
-  const [ano, mes, dia] = dataCompra.split("-").map(Number);
+  const [ano, mes, dia] = dataCompra.split('-').map(Number);
   const m = mes - 1; // Mês base 0 (0 = Jan, 11 = Dez)
-  const fechamentoDoMes = Math.min(
-    cartao.diaFechamento,
-    ultimoDiaDoMes(ano, m),
-  );
+  const fechamentoDoMes = Math.min(cartao.diaFechamento, ultimoDiaDoMes(ano, m));
 
   // Se comprou antes do corte, fecha este mês; se comprou no dia do corte ou após, fecha no mês seguinte
   let mesFechamento = dia < fechamentoDoMes ? m : m + 1;
@@ -109,9 +106,7 @@ export function calcularFatura(dataCompra, cartao, numeroParcela = 1) {
 
   // Define se o vencimento é no mesmo mês do fechamento ou no mês seguinte
   const mesVencimento =
-    cartao.diaVencimento > cartao.diaFechamento
-      ? mesFechamento
-      : mesFechamento + 1;
+    cartao.diaVencimento > cartao.diaFechamento ? mesFechamento : mesFechamento + 1;
   const vencimento = dataSegura(ano, mesVencimento, cartao.diaVencimento);
 
   const iso = (d) => d.toISOString().slice(0, 10);

@@ -10,8 +10,8 @@
 //   Importado como objeto completo porque o pacote usa padrão
 //  CommonJS internamente
 // - dotenv: lê o arquivo .env da raiz
-import pkg from "pg";
-import dotenv from "dotenv";
+import pkg from 'pg';
+import dotenv from 'dotenv';
 
 // variáveis de ambiente
 dotenv.config();
@@ -42,17 +42,17 @@ const pool = new Pool(
   process.env.DATABASE_URL
     ? { connectionString: process.env.DATABASE_URL }
     : {
-        host: process.env.DB_HOST || "localhost",
+        host: process.env.DB_HOST || 'localhost',
         port: Number(process.env.DB_PORT) || 5432,
-        user: process.env.DB_USER || "postgres",
-        password: process.env.DB_PASSWORD || "postgres",
-        database: process.env.DB_NAME || "financas",
-      },
+        user: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD || 'postgres',
+        database: process.env.DB_NAME || 'financas',
+      }
 );
 
 // Evento disparado por erro
-pool.on("error", (err) => {
-  console.error("Erro inesperado no pool do PostgreSQL:", err);
+pool.on('error', (err) => {
+  console.error('Erro inesperado no pool do PostgreSQL:', err);
 });
 
 // 4. FUNÇÕES PARA OS MODELS:
