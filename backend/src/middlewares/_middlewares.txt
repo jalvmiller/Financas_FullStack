@@ -1,0 +1,19 @@
+
+
+
+Responsável pelos interceptadores que rodam no meio do caminho entre a requisição e a resposta (usando next());
+semelhante aos Filters / Interceptors e @ControllerAdvice do Spring Boot
+
+
+-----auth.js (validação do token JWT)-----
+1. lê o cabeçalho Authorization no formato "Bearer <token>";
+2. valida a assinatura e expiração com jwt.verify(token, JWT_SECRET);
+3. grava payload.sub em req.usuarioId e chama next(); se faltar ou expirar, devolve 401;
+
+
+-----errorHandler.js (tratamento centralizado de erros)-----
+1. middleware de erro do Express com 4 parâmetros (err, req, res, next);
+2. traduz códigos do PostgreSQL para HTTP adequado: 
+   23505 (UNIQUE) -> 409 Conflict indicando o campo; 
+   23503 (FK em uso) -> 409;
+3. garante o padrão único de resposta de erro

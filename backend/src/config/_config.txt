@@ -1,0 +1,23 @@
+
+
+
+Responsável pela configuração do banco de dados, criação inicial (setup) e funções utilitárias puras de data/CPF/fatura;
+tudo que serve de apoio para models e routes sem depender de HTTP (req/res)
+
+
+-----db.js (pool de conexões PostgreSQL)-----
+1. cria um Pool do pacote pg usando DATABASE_URL ou variáveis DB_* do .env;
+2. configura parsers para o pg devolver NUMERIC como número e DATE como 'AAAA-MM-DD' (evita ::FLOAT e TO_CHAR nas queries);
+3. exporta query() para consultas simples e getClient() para transações (BEGIN/COMMIT);
+
+
+-----setupDb.js (script de criação e seed)-----
+1. rodado via "npm run db:setup" na linha de comando;
+2. conecta no banco 'postgres' padrão para criar o banco 'financas' se ainda não existir;
+3. lê e executa schema.sql (tabelas/constraints) e seed.sql (2 usuários e > 3 meses de dados);
+
+
+-----utils.js (regras puras e helpers de data)-----
+1. cpfValido: calcula e confere os dois dígitos verificadores do CPF (rejeita 111.111.111-11 etc.);
+2. calcularFatura: aplica a regra de fechamento/vencimento do cartão em UTC (compra no dia do corte ou depois vai para o mês seguinte);
+3. mesAtualRange / dataValidaISO / lerPeriodo / arredondar: helpers compartilhados entre lancamentos e relatorios;

@@ -1,0 +1,41 @@
+
+
+
+Responsável por determinar queries; fazer o recebimento de params com base no model; 
+semelhante ao repository do springboot
+
+-----categoria, padrão de CRUD-----
+1. Seeder de categorias predefinidas, vai atrelar a cada usuário; 
+2. criar(com Seeder)/listarPorUsuario/buscarPorId/criar/atualizar/excluir;
+3. conferir se existe lançamento ligado ao usuario;
+
+
+-----fonteDestino, padrão de CRUD-----
+1. análogo ao de categoria, mas lida com a lógica do cartão que
+garante que as contas comuns não fiquem com dados de cartão..
+2. reserva
+
+
+-----lancamento (transações, rollback e commit)-----
+1. ACID, difere do query simples já que lida com getClient para manter uma conexão
+fixa de transação.. se a operação resultar em erro, faz rollback.. se der certo,
+faz commit
+2. exclusão em grupo se todasParcelas = true
+3.  SELECT com dois JOINS (fonteDestino e categoria), 
+
+
+-----relatorio (queries de relatório)-----
+1. somente leitura (SELECT), não corresponde a nenhuma tabela própria no banco;
+2. concentra agregações (SUM, GROUP BY) usadas em relatorios.routes.js e 
+saudeFinanceira.routes.js;
+3. totaisPorTipo/totaisReserva/totalPorCategoria/
+totalPorFonteDestino/lancamentosDoCartao;
+
+
+-----usuario-----
+1. não filtra por usuario_id (ele é o próprio dono dos dados) e não tem
+atualizar/excluir;
+2. normaliza email (toLowerCase) e cpf (só dígitos) antes de gravar para
+o UNIQUE funcionar;
+3. buscarPorEmail traz senha_hash (só para o login); buscarPorId omite
+senha_hash para nunca vazar na API;

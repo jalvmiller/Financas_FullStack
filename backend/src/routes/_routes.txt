@@ -1,0 +1,43 @@
+
+
+
+Responsável pelos endpoints da API REST; recebe req, valida entradas, chama os models e devolve status HTTP + JSON;
+pela regra 10.9 do enunciado, os controladores ficam aqui dentro (sem pasta controllers separada)
+
+
+-----auth.routes.js (cadastro, login e /me)-----
+1. validarCadastro: middleware local que checa campos obrigatórios, regex de email, cpfValido e senha forte;
+2. POST /cadastro: gera hash com bcrypt, cria usuário, dispara Categoria.criarPadrao e FonteDestino.criarPadrao; captura 23505 para devolver 409 no campo certo;
+3. POST /login: confere senha com bcrypt.compare (erro genérico 401 se falhar) e emite JWT;
+4. GET /me: protegido por autenticar, devolve dados do usuário logado sem senha_hash;
+
+
+-----categorias.routes.js (CRUD de categorias)-----
+1. todas as rotas protegidas por router.use(autenticar);
+2. GET / POST / PUT /:id / DELETE /:id sempre filtrando por req.usuarioId (RF3);
+3. no DELETE, consulta temLancamentosVinculados e bloqueia com 409 se a categoria estiver em uso;
+
+
+-----fontesDestinos.routes.js (CRUD de contas, rendas e cartões)-----
+1. validarFonteDestino: se tipo === 'cartao_credito', exige dia_fechamento, dia_vencimento (1-31) e limite > 0 (400 se faltar);
+2. se tipo === 'conta', aceita o booleano reserva (usado na reserva de emergência);
+3. no DELETE, também bloqueia com 409 se houver lançamentos vinculados;
+
+
+-----lancamentos.routes.js (CRUD + parcelamento)-----
+1. validarPayloadLancamento: confere posse da categoria e fonte/destino (404 se for de outro usuário) e se categoria.tipo === lancamento.tipo (400 se divergir);
+2. só permite totalParcelas > 1 (1 a 48) quando for saída no cartão_credito;
+3. GET /: filtros por período (padrão mês atual), tipo, categoriaId, fonteDestinoId e paginação;
+4. DELETE /:id: aceita ?todasParcelas=true para apagar toda a compra parcelada;
+
+
+-----relatorios.routes.js (agregações e previsão de faturas)-----
+1. GET /categorias (RF7): totais por categoria, % sobre saídas e variação comparando com período anterior de mesmo tamanho;
+2. GET /fontes-destinos (RF8): entradas, saídas e saldo por fonte/destino no período;
+3. GET /faturas (RF9): usa calcularFatura para montar fatura aberta + próximas N faturas e calcular limite utilizado/disponível;
+
+
+-----saudeFinanceira.routes.js (desafio extra: indicadores e projeção)-----
+1. GET /: calcula taxa de poupança, médias dos últimos 3 meses, reserva de emergência e comprometimento com cartões;
+2. projeta o saldo dos próximos 6 meses somando médias + parcelas futuras de cartão;
+3. gera dicas educativas com base em regras (if/else) e devolve avisoEducativo obrigatório;
