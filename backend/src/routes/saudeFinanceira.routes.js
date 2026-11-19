@@ -3,12 +3,20 @@ import { Relatorio } from '../models/Relatorio.js';
 import { calcularFatura, arredondar, mesAtualRange } from '../config/utils.js';
 import { autenticar } from '../middlewares/auth.js';
 
+// --------------------------------------------------
+// saudeFinanceira.routes.js - desafio extra (10.5.10)
+// --------------------------------------------------
+// 1. calcula no servidor taxa de poupança, média dos últimos 3 meses, reserva de emergência e comprometimento com cartões;
+// 2. projeta o saldo dos próximos 6 meses somando média mensal + parcelas futuras já lançadas;
+// 3. gera dicas por regras (if/else com limites documentados no README) e devolve avisoEducativo obrigatório;
+
 const router = Router();
+// Protege a rota com autenticação JWT
 router.use(autenticar);
 
 /**
  * GET /api/saude-financeira
- * Desafio (10.5.10): Calcula indicadores, projeções de saldo e gera dicas educativas no back-end.
+ * Desafio (10.5.10): Calcula indicadores, projeções de saldo e gera dicas educativas no back-end
  */
 router.get('/', async (req, res, next) => {
   try {
@@ -17,16 +25,17 @@ router.get('/', async (req, res, next) => {
     const ano = hoje.getFullYear();
     const mes = hoje.getMonth();
 
-    // Referência 'AAAA-MM' do mês atual + i meses
+    // Referência 'AAAA-MM' do mês atual + i meses (usado como chave para agrupar faturas e projeção)
     const mesRef = (i) => new Date(Date.UTC(ano, mes + i, 1)).toISOString().slice(0, 7);
 
     const { inicio: inicioMesAtual, fim: fimMesAtual } = mesAtualRange();
 
-    // Últimos 3 meses completos até o fim do mês atual
+    // Últimos 3 meses completos até o fim do mês atual (mes - 2, mes - 1 e mes atual)
     const inicio3Meses = new Date(Date.UTC(ano, mes - 2, 1)).toISOString().slice(0, 10);
 
     // 1. Entradas e saídas do mês atual
     const mesAtual = await Relatorio.totaisPorTipo(req.usuarioId, inicioMesAtual, fimMesAtual);
+    // Taxa de poupança: percentual que sobrou das entradas do mês (evita divisão por zero se entrada === 0)
     const taxaPoupanca =
       mesAtual.entrada > 0
         ? arredondar(((mesAtual.entrada - mesAtual.saida) / mesAtual.entrada) * 100)
@@ -39,7 +48,9 @@ router.get('/', async (req, res, next) => {
 
     // 3. Reserva de emergência (saldo das contas marcadas como reserva = TRUE)
     const reserva = await Relatorio.totaisReserva(req.usuarioId);
+    // Math.max(0, ...) evita exibir reserva negativa caso tenham saído mais recursos do que entraram
     const valorReserva = Math.max(0, arredondar(reserva.entrada - reserva.saida));
+    // Quantos meses de despesa média a reserva atual consegue cobrir
     const mesesReserva =
       despesaMediaMensal > 0 ? Number((valorReserva / despesaMediaMensal).toFixed(1)) : 0;
 
@@ -56,6 +67,7 @@ router.get('/', async (req, res, next) => {
       };
       const fatura = calcularFatura(l.data, cartao, l.parcela_atual);
 
+      // Considera apenas parcelas cuja fatura ainda não venceu
       if (fatura.vencimento >= hojeISO) {
         totalParcelasFuturas += l.valor;
         faturasPorMes[fatura.referencia] = (faturasPorMes[fatura.referencia] || 0) + l.valor;
@@ -63,7 +75,7 @@ router.get('/', async (req, res, next) => {
     }
     totalParcelasFuturas = arredondar(totalParcelasFuturas);
 
-    // Comprometimento dos próximos 3 meses com cartão
+    // Comprometimento dos próximos 3 meses com cartão (faturas de mes+0, mes+1 e mes+2 sobre 3x a renda média)
     const faturasProximos3Meses =
       (faturasPorMes[mesRef(0)] || 0) +
       (faturasPorMes[mesRef(1)] || 0) +
@@ -72,12 +84,14 @@ router.get('/', async (req, res, next) => {
       rendaMediaMensal > 0 ? arredondar((faturasProximos3Meses / (rendaMediaMensal * 3)) * 100) : 0;
 
     // 5. Projeção de saldo para os próximos 6 meses
+    // Parte do saldo geral histórico (todas as entradas - todas as saídas)
     const geral = await Relatorio.totaisPorTipo(req.usuarioId);
     let saldoAcumulado = geral.entrada - geral.saida;
     const projecao = [];
 
     for (let i = 1; i <= 6; i++) {
       const parcelasDoMes = faturasPorMes[mesRef(i)] || 0;
+      // A cada mês futuro, soma o fluxo médio (renda - despesa) e desconta as parcelas já conhecidas
       saldoAcumulado += rendaMediaMensal - despesaMediaMensal - parcelasDoMes;
       projecao.push({
         mes: mesRef(i),
@@ -85,7 +99,7 @@ router.get('/', async (req, res, next) => {
       });
     }
 
-    // 6. Geração de dicas baseadas nos dados calculados
+    // 6. Geração de dicas baseadas nos dados calculados (limites documentados no README)
     const dicas = [];
 
     if (mesAtual.entrada > 0) {

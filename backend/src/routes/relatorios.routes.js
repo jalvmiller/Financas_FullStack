@@ -4,7 +4,16 @@ import { Relatorio } from '../models/Relatorio.js';
 import { calcularFatura, arredondar, lerPeriodo } from '../config/utils.js';
 import { autenticar } from '../middlewares/auth.js';
 
+// --------------------------------------------------
+// relatorios.routes.js - relatórios e faturas (RF7, RF8 e RF9)
+// --------------------------------------------------
+// 1. busca as agregações prontas em Relatorio.js (GROUP BY/SUM no banco) sem SQL direto na rota;
+// 2. GET /categorias (RF7): saídas por categoria, % e comparação com período anterior de mesmo tamanho;
+// 3. GET /fontes-destinos (RF8): entradas, saídas e saldo por conta/cartão/renda;
+// 4. GET /faturas (RF9): aplica calcularFatura para montar fatura atual + próximas N e limite disponível;
+
 const router = Router();
+// Protege todas as rotas de relatórios com JWT
 router.use(autenticar);
 
 // Período anterior com o mesmo tamanho (ex.: outubro × setembro)
@@ -12,8 +21,10 @@ function periodoAnterior(inicioISO, fimISO) {
   const DIA = 86400000; // milissegundos em um dia
   const inicio = new Date(`${inicioISO}T00:00:00Z`);
   const fim = new Date(`${fimISO}T00:00:00Z`);
+  // Soma +1 porque início e fim são inclusivos (ex: 01/10 a 31/10 = 31 dias)
   const dias = Math.round((fim - inicio) / DIA) + 1;
 
+  // Retrocede 1 dia do início atual para achar o fim do período anterior, e volta (dias - 1) para o início
   const antFim = new Date(inicio.getTime() - DIA);
   const antInicio = new Date(antFim.getTime() - (dias - 1) * DIA);
 
@@ -56,13 +67,16 @@ router.get('/categorias', async (req, res, next) => {
     const totalSaidas = somarTotais(saidas);
 
     const categorias = saidas.map((c) => {
+      // Se a categoria não teve gasto no período anterior, considera 0 para calcular a variação
       const anteriorDaCategoria = saidasAnteriores.find((a) => a.id === c.id)?.total || 0;
       return {
         id: c.id,
         nome: c.nome,
         total: c.total,
+        // Participação percentual da categoria sobre o total de saídas do período
         percentual: arredondar((c.total / totalSaidas) * 100),
         periodoAnterior: anteriorDaCategoria,
+        // Positivo = aumento de gasto; negativo = redução em relação ao período anterior
         variacao: arredondar(c.total - anteriorDaCategoria),
       };
     });
@@ -125,10 +139,12 @@ router.get('/fontes-destinos', async (req, res, next) => {
  */
 router.get('/faturas', async (req, res, next) => {
   try {
+    // Limita a previsão entre 3 (mínimo do RF9) e 12 meses
     const meses = Math.max(3, Math.min(12, Number(req.query.meses) || 3));
     const hojeISO = new Date().toISOString().slice(0, 10);
 
     const fontes = await FonteDestino.listarPorUsuario(req.usuarioId);
+    // Filtra apenas as fontes que são cartões de crédito
     const cartoes = fontes.filter((f) => f.tipo === 'cartao_credito');
 
     const resultado = [];

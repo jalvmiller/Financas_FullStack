@@ -5,9 +5,18 @@ import { FonteDestino } from '../models/FonteDestino.js';
 import { autenticar } from '../middlewares/auth.js';
 import { dataValidaISO, lerPeriodo } from '../config/utils.js';
 
+// --------------------------------------------------
+// lancamentos.routes.js - CRUD e parcelamento (RF6)
+// --------------------------------------------------
+// 1. validarPayloadLancamento: valida valor > 0, data ISO, posse da categoria/fonte (404 se outro usuário)
+//    e compatibilidade de tipo (categoria entrada não aceita lançamento saída);
+// 2. parcelamento (1 a 48x) só passa se for saída no cartao_credito;
+// 3. GET /: lista com filtros e paginação; DELETE /:id aceita ?todasParcelas=true para apagar o grupo;
+
 const router = Router();
 router.use(autenticar);
 
+// Middleware local que valida formato dos campos e regras de negócio no banco antes de salvar
 async function validarPayloadLancamento(req, res, next) {
   const tipo = req.body.tipo;
   const descricao = req.body.descricao;
@@ -15,6 +24,7 @@ async function validarPayloadLancamento(req, res, next) {
   const data = req.body.data;
   const categoriaId = Number(req.body.categoriaId);
   const fonteDestinoId = Number(req.body.fonteDestinoId);
+  // Se não for informado, assume que é 1 parcela
   const totalParcelas = Number(req.body.totalParcelas ?? 1);
 
   const campos = {};
@@ -42,7 +52,7 @@ async function validarPayloadLancamento(req, res, next) {
   if (!Number.isInteger(totalParcelas) || totalParcelas < 1 || totalParcelas > 48) {
     campos.totalParcelas = 'O número de parcelas deve estar entre 1 e 48.';
   }
-
+  // Informar campos inválidos:
   if (Object.keys(campos).length > 0) {
     return res.status(400).json({ erro: 'Dados inválidos.', campos });
   }
@@ -57,6 +67,7 @@ async function validarPayloadLancamento(req, res, next) {
       });
     }
 
+    // Impede lançar saída em categoria de entrada e vice-versa (RF6)
     if (categoria.tipo !== tipo) {
       return res.status(400).json({
         erro: 'Dados inválidos.',
@@ -76,6 +87,7 @@ async function validarPayloadLancamento(req, res, next) {
       });
     }
 
+    // Regra RF6: parcelamento só faz sentido para compras (saída) no cartão de crédito
     if (totalParcelas > 1 && (fonteDestino.tipo !== 'cartao_credito' || tipo !== 'saida')) {
       return res.status(400).json({
         erro: 'Dados inválidos.',
@@ -85,6 +97,7 @@ async function validarPayloadLancamento(req, res, next) {
       });
     }
 
+    // Guarda os dados já validados em req para reutilizar no POST e no PUT
     req.lancamentoValidado = {
       tipo,
       descricao,
@@ -101,8 +114,10 @@ async function validarPayloadLancamento(req, res, next) {
   }
 }
 
+// GET /api/lancamentos -> lista lançamentos com filtros, totais do período e paginação
 router.get('/', async (req, res, next) => {
   try {
+    // lerPeriodo lê ?inicio=&fim= da query string ou usa o mês corrente como padrão
     const periodo = lerPeriodo(req.query);
     if (!periodo) {
       return res.status(400).json({ erro: 'Parâmetros de data inválidos.' });
@@ -113,6 +128,7 @@ router.get('/', async (req, res, next) => {
       tipo: req.query.tipo,
       categoriaId: req.query.categoriaId,
       fonteDestinoId: req.query.fonteDestinoId,
+      // Limita página >= 1 e tamanho da página <= 100 registros
       pagina: Math.max(1, Number(req.query.pagina) || 1),
       limite: Math.min(100, Number(req.query.limite) || 15),
     });
@@ -126,16 +142,23 @@ router.get('/', async (req, res, next) => {
 router.post('/', validarPayloadLancamento, async (req, res, next) => {
   try {
     const criados = await Lancamento.criar({
+      // operador spread: espalha as propriedades de req.lancamentoValidado
+      // em novo objeto.. se o objeto já tiver uma propriedade com o mesmo nome,
+      // ela será sobrescrita pelo último objeto a ser espalhado.
+      // ...req.lancamentoValidado, é o que vem do payload validado
+      // usuarioId: req.usuarioId, é o id do usuário logado
       usuarioId: req.usuarioId,
       ...req.lancamentoValidado,
     });
 
+    // ternário para retornar o lançamento criado ou um array de lançamentos criados
     return res.status(201).json(criados.length === 1 ? criados[0] : { lancamentos: criados });
   } catch (erro) {
     return next(erro);
   }
 });
 
+// GET /api/lancamentos/:id -> detalha um lançamento específico do usuário (RF3 -> 404 se de outro)
 router.get('/:id', async (req, res, next) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -153,6 +176,7 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
+// PUT /api/lancamentos/:id -> atualiza o lançamento passando pelas mesmas validações do POST
 router.put('/:id', validarPayloadLancamento, async (req, res, next) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -170,6 +194,7 @@ router.put('/:id', validarPayloadLancamento, async (req, res, next) => {
   }
 });
 
+// DELETE /api/lancamentos/:id -> apaga a parcela ou o grupo inteiro se vier ?todasParcelas=true
 router.delete('/:id', async (req, res, next) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {

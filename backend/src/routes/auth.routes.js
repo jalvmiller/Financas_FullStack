@@ -7,6 +7,14 @@ import { FonteDestino } from '../models/FonteDestino.js';
 import { cpfValido } from '../config/utils.js';
 import { autenticar } from '../middlewares/auth.js';
 
+// --------------------------------------------------
+// auth.routes.js - cadastro, login e /me (RF1 e RF2)
+// --------------------------------------------------
+// 1. validarCadastro: middleware local que checa nome, regex de e-mail, cpfValido e senha forte;
+// 2. POST /cadastro: gera hash bcrypt, cria usuário + categorias/fonte padrão; 23505 vira 409 no campo;
+// 3. POST /login: valida credenciais sem revelar se o e-mail existe (401) e emite JWT;
+// 4. GET /me: protegido por JWT, devolve os dados públicos do usuário logado;
+
 const router = Router();
 
 /**
@@ -109,6 +117,13 @@ router.post('/cadastro', validarCadastro, async (req, res, next) => {
       const isCpf = erro.constraint?.includes('cpf') || erro.detail?.includes('cpf');
       const campo = isCpf ? 'cpf' : 'email';
       return res.status(409).json({
+        // Retorno de conflito
+        // O erro original do sequelize é:
+        // "SequelizeUniqueConstraintError: Validation error"
+        // campos é um objeto que retorna a propriedade específica que deu conflito.
+        // [campo] é uma sintaxe para criar uma propriedade com o valor da variável campo
+        // 'cpf', 'CPF', 'e-mail', ficam no retorno condicional
+        // que define se o retorno vai usar 'cpf' ou 'e-mail'
         erro: 'Usuário já cadastrado.',
         campos: {
           [campo]: `Já existe um usuário com este ${campo === 'cpf' ? 'CPF' : 'e-mail'}.`,
@@ -130,6 +145,12 @@ router.post('/login', async (req, res, next) => {
     return res.status(400).json({
       erro: 'Dados inválidos.',
       campos: {
+        // spread operator para adicionar propriedades ao objeto
+        // como funciona:
+        // !email é true se o email for null, undefined, '', 0, false
+        // então se for true, adiciona a propriedade email
+        // se for false, não adiciona a propriedade email
+        // o mesmo vale para senha
         ...(!email ? { email: 'E-mail não informado.' } : {}),
         ...(!senha ? { senha: 'Senha não informada.' } : {}),
       },
@@ -150,6 +171,11 @@ router.post('/login', async (req, res, next) => {
     }
 
     const token = jwt.sign(
+      // Assinatura: cria o token com os dados do usuário
+      // { sub: usuario.id, nome: usuario.nome, email: usuario.email } é o payload,
+      // que é o conteúdo que será criptografado
+      // process.env.JWT_SECRET é a chave secreta que será usada para criptografar o payload.
+      // expiresIn: é expiração do token
       { sub: usuario.id, nome: usuario.nome, email: usuario.email },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '1h' }

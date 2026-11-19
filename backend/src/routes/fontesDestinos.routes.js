@@ -2,9 +2,18 @@ import { Router } from 'express';
 import { FonteDestino } from '../models/FonteDestino.js';
 import { autenticar } from '../middlewares/auth.js';
 
+// --------------------------------------------------
+// fontesDestinos.routes.js - CRUD de fontes/destinos (RF5)
+// --------------------------------------------------
+// 1. gerencia contas, rendas e cartões do usuário logado (RF3);
+// 2. se tipo === 'cartao_credito', exige fechamento/vencimento (1-31) e limite > 0;
+// 3. se tipo === 'conta', aceita reserva (usada na reserva de emergência); barra DELETE se em uso (409);
+
 const router = Router();
+// Protege todas as rotas deste arquivo com autenticação JWT
 router.use(autenticar);
 
+// Middleware local de validação antes do POST e PUT (RF5)
 function validarFonteDestino(req, res, next) {
   const { nome, tipo, dia_fechamento, dia_vencimento, limite } = req.body;
   const campos = {};
@@ -19,6 +28,7 @@ function validarFonteDestino(req, res, next) {
     campos.tipo = 'O tipo deve ser "renda", "conta" ou "cartao_credito".';
   }
 
+  // Campos de faturamento são obrigatórios somente quando o tipo for cartão de crédito
   if (tipo === 'cartao_credito') {
     const fech = Number(dia_fechamento);
     const venc = Number(dia_vencimento);
@@ -42,6 +52,7 @@ function validarFonteDestino(req, res, next) {
   next();
 }
 
+// GET /api/fontes-destinos -> lista contas, rendas e cartões do usuário
 router.get('/', async (req, res, next) => {
   try {
     const lista = await FonteDestino.listarPorUsuario(req.usuarioId);
@@ -51,6 +62,7 @@ router.get('/', async (req, res, next) => {
   }
 });
 
+// POST /api/fontes-destinos -> cria fonte/destino limpando campos específicos de outros tipos
 router.post('/', validarFonteDestino, async (req, res, next) => {
   try {
     const { nome, tipo, dia_fechamento, dia_vencimento, limite, reserva } = req.body;
@@ -58,6 +70,7 @@ router.post('/', validarFonteDestino, async (req, res, next) => {
       usuarioId: req.usuarioId,
       nome,
       tipo,
+      // Se for cartão de crédito, converte os valores, caso contrário, define como null
       diaFechamento: tipo === 'cartao_credito' ? Number(dia_fechamento) : null,
       diaVencimento: tipo === 'cartao_credito' ? Number(dia_vencimento) : null,
       limite: tipo === 'cartao_credito' ? Number(limite) : null,
@@ -69,6 +82,7 @@ router.post('/', validarFonteDestino, async (req, res, next) => {
   }
 });
 
+// PUT /api/fontes-destinos/:id -> atualiza registro pertencente ao usuário
 router.put('/:id', validarFonteDestino, async (req, res, next) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -96,6 +110,7 @@ router.put('/:id', validarFonteDestino, async (req, res, next) => {
   }
 });
 
+// DELETE /api/fontes-destinos/:id -> barra com 409 se houver lançamentos usando essa fonte/destino
 router.delete('/:id', async (req, res, next) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
@@ -108,6 +123,7 @@ router.delete('/:id', async (req, res, next) => {
       return res.status(404).json({ erro: 'Fonte/Destino não encontrado.' });
     }
 
+    // Regra RF5: impede exclusão enquanto houver vínculo na tabela lancamentos
     const emUso = await FonteDestino.temLancamentosVinculados(id, req.usuarioId);
     if (emUso) {
       return res.status(409).json({
@@ -116,6 +132,7 @@ router.delete('/:id', async (req, res, next) => {
     }
 
     await FonteDestino.excluir(id, req.usuarioId);
+    // 204 No Content: remoção concluída sem corpo
     return res.status(204).send();
   } catch (erro) {
     return next(erro);
