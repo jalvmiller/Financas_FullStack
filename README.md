@@ -1,7 +1,8 @@
 # Projeto - Aplicação Full Stack de Controle Financeiro Pessoal
 
 **Disciplina:** Programação Web Full Stack
-**Tipo:** Projeto Avaliativo
+
+**Tipo:** Projeto 2
 
 ---
 
