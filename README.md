@@ -1,8 +1,10 @@
-# Projeto - Aplicação Full Stack de Controle Financeiro Pessoal
+# Projeto 2 - Aplicação Full Stack de Controle Financeiro Pessoal
 
 **Disciplina:** Programação Web Full Stack
 
-**Tipo:** Projeto 2
+**Nome:** João Marcelo Alves Müller
+
+**Link do vídeo:** https://drive.google.com/file/d/1UQJjClyDdLDe4F-LszXiBiQsYC_-RDZE/view?usp=sharing
 
 ---
 
